@@ -1,0 +1,28 @@
+{%- comment -%}
+  A link to the customer's referral dashboard, which is a full storefront page served by the
+  app at /apps/referral. Everything shown on that page is managed in the app's admin
+  (Program settings), so this block only needs a label.
+
+  You do not need this block to link to the dashboard — any <a href="/apps/referral"> in the
+  theme (header menu, footer, account page) opens it. Add "Referral dashboard" to a menu with
+  the URL /apps/referral for the cleanest setup.
+{%- endcomment -%}
+<link rel="stylesheet" href="{{ 'referral-dashboard.css' | asset_url }}">
+
+<div class="rmd-mount"
+     {{ block.shopify_attributes }}
+     style="--rmd-accent: {{ block.settings.accent }}; --rmd-accent-2: {{ block.settings.accent_2 }};">
+  <a class="rmd-trigger" href="/apps/referral">{{ block.settings.label | escape }}</a>
+</div>
+
+{% schema %}
+{
+  "name": "Referral dashboard link",
+  "target": "section",
+  "settings": [
+    { "type": "text", "id": "label", "label": "Button label", "default": "Refer & earn" },
+    { "type": "color", "id": "accent", "label": "Accent", "default": "#5b4bdb" },
+    { "type": "color", "id": "accent_2", "label": "Accent (gradient end)", "default": "#e0557f" }
+  ]
+}
+{% endschema %}

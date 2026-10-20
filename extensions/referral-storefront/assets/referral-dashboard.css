@@ -1,0 +1,15 @@
+/* The dashboard itself is a page rendered by the app (app/dashboard-html.server.js) and
+   carries its own styles. This file only styles the link button this block renders. */
+.rmd-mount { padding: 8px 0; }
+.rmd-trigger {
+  display: inline-block;
+  padding: 10px 20px;
+  border-radius: 999px;
+  background: linear-gradient(100deg, var(--rmd-accent, #5b4bdb), var(--rmd-accent-2, #e0557f));
+  color: #fff;
+  font: inherit;
+  font-weight: 600;
+  text-decoration: none;
+}
+.rmd-trigger:hover { opacity: 0.9; }
+.rmd-trigger:focus-visible { outline: 2px solid var(--rmd-accent, #5b4bdb); outline-offset: 2px; }

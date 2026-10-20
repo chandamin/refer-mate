@@ -1,0 +1,189 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+// Note that some adapters may set a maximum length for the String type by default, please ensure your strings are long
+// enough when changing adapters.
+// See https://www.prisma.io/docs/orm/reference/prisma-schema-reference#string for more information
+datasource db {
+  provider = "sqlite"
+  url      = "file:dev.sqlite"
+}
+
+model Session {
+  id                  String    @id
+  shop                String
+  state               String
+  isOnline            Boolean   @default(false)
+  scope               String?
+  expires             DateTime?
+  accessToken         String
+  userId              BigInt?
+  firstName           String?
+  lastName            String?
+  email               String?
+  accountOwner        Boolean   @default(false)
+  locale              String?
+  collaborator        Boolean?  @default(false)
+  emailVerified       Boolean?  @default(false)
+  refreshToken        String?
+  refreshTokenExpires DateTime?
+}
+
+// Merchant dashboard (inside Shopify Admin)
+model Referral {
+  id              String   @id @default(cuid())
+  shop            String   @unique
+  code            String   @unique
+  clicks          Int      @default(0)
+  leads           Int      @default(0)
+  conversions     Int      @default(0)
+  payoutConnected Boolean  @default(false)
+  // Shopify discount created for this referral link (see app/discount.server.js)
+  discountCode    String?
+  discountGid     String?
+  // Customer segment limiting the discount to shoppers with no previous orders
+  segmentGid      String?
+  createdAt       DateTime @default(now())
+}
+
+// Storefront dashboard: one row per logged-in customer
+model Affiliate {
+  id           String   @id @default(cuid())
+  shop         String
+  customerId   String
+  code         String   @unique
+  clicks       Int      @default(0)
+  leads        Int      @default(0)
+  conversions  Int      @default(0)
+  upcoming     Float    @default(0)
+  paid         Float    @default(0)
+  discountCode String?
+  discountGid  String?
+  email        String?
+  name         String?
+  // Where the merchant should send this customer's earnings (paid manually).
+  payoutMethod  String?
+  payoutDetails String?
+  createdAt    DateTime @default(now())
+
+  links            AffiliateLink[]
+  conversionEvents Conversion[]
+  payouts          Payout[]
+
+  @@unique([shop, customerId])
+}
+
+// ---------------------------------------------------------------------------
+// Program configuration, managed by the merchant in Shopify Admin.
+// One row per shop; created with sensible defaults on first admin page load.
+// ---------------------------------------------------------------------------
+model ProgramSettings {
+  id                String   @id @default(cuid())
+  shop              String   @unique
+  enabled           Boolean  @default(true)
+  // What the referrer earns, and for how long after they refer someone.
+  commissionPercent Float    @default(20)
+  commissionMonths  Int      @default(6)
+  // What the referred shopper gets off their first order.
+  discountPercent   Float    @default(20)
+  // Payout rules are displayed to customers but not acted on yet.
+  minPayout         Float    @default(100)
+  // Symbol shown before every amount, e.g. £ $ €.
+  currency          String   @default("£")
+  holdingDays       Int      @default(30)
+  termsUrl          String?
+  faq               String?
+  resources         String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+}
+
+// Extra tracking links a customer can create for themselves ("Links" tab).
+model AffiliateLink {
+  id          String    @id @default(cuid())
+  affiliateId String
+  affiliate   Affiliate @relation(fields: [affiliateId], references: [id], onDelete: Cascade)
+  label       String
+  code        String    @unique
+  clicks      Int       @default(0)
+  createdAt   DateTime  @default(now())
+
+  @@index([affiliateId])
+}
+
+// One row per referred order. Commission is held until maturesAt, after which
+// it counts as payable — the payout itself is deliberately out of scope for now.
+model Conversion {
+  id            String    @id @default(cuid())
+  shop          String
+  affiliateId   String
+  affiliate     Affiliate @relation(fields: [affiliateId], references: [id], onDelete: Cascade)
+  orderId       String    @unique
+  orderName     String?
+  customerEmail String?
+  subtotal      Float     @default(0)
+  commission    Float     @default(0)
+  // pending (inside holding period) | approved (matured) | requested (customer asked
+  // to be paid, see Payout) | paid | void (refunded)
+  status        String    @default("pending")
+  payoutId      String?
+  maturesAt     DateTime
+  createdAt     DateTime  @default(now())
+
+  @@index([shop, affiliateId])
+}
+
+// Extra rewards the merchant defines; shown on the customer's Bounties tab.
+model Bounty {
+  id          String   @id @default(cuid())
+  shop        String
+  title       String
+  description String?
+  reward      Float    @default(0)
+  // Number of referred orders needed to earn it.
+  target      Int      @default(1)
+  active      Boolean  @default(true)
+  createdAt   DateTime @default(now())
+
+  @@index([shop])
+}
+
+// A shopper brought in by a referrer. Lets later orders from the same person
+// keep earning commission for commissionMonths, even though only their FIRST
+// order carries the referral discount code.
+model ReferredCustomer {
+  id          String   @id @default(cuid())
+  shop        String
+  affiliateId String
+  email       String
+  referredAt  DateTime @default(now())
+
+  @@unique([shop, email])
+  @@index([affiliateId])
+}
+
+// A payment from the merchant to a referrer. Money is sent by hand, outside the app;
+// this row is the record. A customer's request creates it as "requested", and the
+// merchant marks it "paid" once the transfer is made, which zeroes the balance.
+model Payout {
+  id          String    @id @default(cuid())
+  shop        String
+  affiliateId String
+  affiliate   Affiliate @relation(fields: [affiliateId], references: [id], onDelete: Cascade)
+  amount      Float
+  // Snapshot of the customer's payout details at the time of the request.
+  method      String?
+  details     String?
+  // requested | paid | rejected
+  status      String    @default("requested")
+  note        String?
+  createdAt   DateTime  @default(now())
+  paidAt      DateTime?
+
+  @@index([shop, status])
+  @@index([affiliateId])
+}
