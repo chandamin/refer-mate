@@ -1,0 +1,21 @@
+{
+  "name": "refer-mate",
+  "compatibility_date": "2026-10-01",
+  "compatibility_flags": ["nodejs_compat"],
+  "main": "./workers/app.ts",
+  "assets": { "directory": "./build/client" },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "refer-mate",
+      "database_id": "a9d64247-7134-443d-8951-ed5f8f0cd40e",
+      "migrations_dir": "migrations"
+    }
+  ],
+  "vars": {
+    "SCOPES": "write_products,write_metaobjects,write_metaobject_definitions,write_app_proxy,write_discounts,read_customers,read_orders",
+    // Set this to your real URL after the first deploy (see wrangler output).
+    "SHOPIFY_APP_URL": "https://refer-mate.pages.dev",
+    "SHOPIFY_API_KEY": "8e1097c6e785d72374aeea2693aaaaf1"
+  }
+}

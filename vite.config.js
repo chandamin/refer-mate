@@ -1,6 +1,8 @@
+import path from "node:path";
 import { reactRouter } from "@react-router/dev/vite";
 import { defineConfig } from "vite";
 import tsconfigPaths from "vite-tsconfig-paths";
+import { cloudflare } from "@cloudflare/vite-plugin";
 
 // Related: https://github.com/remix-run/remix/issues/2835#issuecomment-1144102176
 // Replace the HOST env var with SHOPIFY_APP_URL so that it doesn't break the Vite server.
@@ -35,7 +37,7 @@ if (host === "localhost") {
   };
 }
 
-export default defineConfig({
+export default defineConfig(({ command }) => ({
   server: {
     allowedHosts: [host],
     cors: {
@@ -48,11 +50,31 @@ export default defineConfig({
       allow: ["app", "node_modules"],
     },
   },
-  plugins: [reactRouter(), tsconfigPaths()],
+  // The Cloudflare plugin only runs for `npm run build`; `shopify app dev`
+  // keeps using the plain Node dev server.
+  plugins: [
+    ...(command === "build"
+      ? [cloudflare({ viteEnvironment: { name: "ssr" } })]
+      : []),
+    reactRouter(),
+    tsconfigPaths(),
+  ],
+  resolve: {
+    // On Workers Prisma must load its wasm query compiler, not the Node engine.
+    alias:
+      command === "build"
+        ? [
+            {
+              find: ".prisma/client/default",
+              replacement: path.resolve("node_modules/.prisma/client/wasm.js"),
+            },
+          ]
+        : [],
+  },
   build: {
     assetsInlineLimit: 0,
   },
   optimizeDeps: {
     include: ["@shopify/app-bridge-react"],
   },
-});
+}));
