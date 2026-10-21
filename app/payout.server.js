@@ -7,7 +7,7 @@ import { getSettings } from "./settings.server";
 //   merchant pays      -> Payout "paid",      commission becomes "paid"  (balance back to 0)
 //   merchant declines  -> Payout "rejected",  commission goes back to "approved"
 
-export const METHODS = ["PayPal", "Bank transfer", "Other"];
+export const METHODS = ["Bank transfer", "Other"];
 
 const money = (v) => Math.round(Number(v || 0) * 100) / 100;
 
@@ -22,7 +22,7 @@ export async function savePayoutDetails(affiliate, method, details) {
   return { saved: true };
 }
 
-// Customer asks to be paid everything that is past its holding period.
+// Customer asks to be paid everything they have earned and not yet been paid.
 export async function requestPayout(affiliate) {
   const settings = await getSettings(affiliate.shop);
   const fresh = await prisma.affiliate.findUnique({ where: { id: affiliate.id } });
@@ -34,7 +34,6 @@ export async function requestPayout(affiliate) {
     where: {
       affiliateId: affiliate.id,
       status: { in: ["pending", "approved"] },
-      maturesAt: { lte: new Date() },
     },
   });
   const amount = money(ready.reduce((t, c) => t + c.commission, 0));
@@ -73,7 +72,7 @@ export async function markPaid(shop, { payoutId, affiliateId, note }) {
   const affiliate = await prisma.affiliate.findFirst({ where: { id: affiliateId, shop } });
   if (!affiliate) return { marked: 0 };
   const ready = await prisma.conversion.findMany({
-    where: { affiliateId, shop, status: { in: ["pending", "approved"] }, maturesAt: { lte: now } },
+    where: { affiliateId, shop, status: { in: ["pending", "approved"] } },
   });
   const amount = money(ready.reduce((t, c) => t + c.commission, 0));
   if (amount <= 0) return { marked: 0 };

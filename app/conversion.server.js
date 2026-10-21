@@ -72,7 +72,8 @@ export async function recordOrder(shop, order) {
   // Commission is on the merchandise total after discounts, before shipping and tax.
   const subtotal = money(order.subtotal_price ?? order.current_subtotal_price);
   const commission = money((subtotal * settings.commissionPercent) / 100);
-  const maturesAt = new Date(Date.now() + settings.holdingDays * DAY);
+  // No holding period: commission is payable straight away.
+  const maturesAt = new Date();
 
   await prisma.$transaction([
     prisma.conversion.create({

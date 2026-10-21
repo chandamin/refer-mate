@@ -179,7 +179,7 @@ export default function Dashboard() {
         <s-section heading="Earnings">
           <s-paragraph>Upcoming: $0.00</s-paragraph>
           <s-paragraph>Paid: $0.00</s-paragraph>
-          <s-paragraph>20% per sale for 6 months · $100 minimum payout · 30-day holding period</s-paragraph>
+          <s-paragraph>20% per sale for 6 months · $100 minimum payout</s-paragraph>
         </s-section>
       )}
 

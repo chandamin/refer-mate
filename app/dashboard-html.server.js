@@ -24,6 +24,7 @@ const ICONS = {
   share: '<circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="M8.6 10.6l6.8-4.2M8.6 13.4l6.8 4.2"/>',
   book: '<path d="M4 4h7a2 2 0 0 1 2 2v14a2 2 0 0 0-2-2H4z"/><path d="M20 4h-7a2 2 0 0 0-2 2v14a2 2 0 0 1 2-2h7z"/>',
   wallet: '<path d="M3 7a2 2 0 0 1 2-2h12v4"/><rect x="3" y="7" width="18" height="12" rx="2"/><circle cx="16" cy="13" r="1.3"/>',
+  lock: '<rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/>',
   trophy: '<path d="M8 21h8M12 17v4M7 4h10v5a5 5 0 0 1-10 0z"/><path d="M17 5h3v2a3 3 0 0 1-3 3M7 5H4v2a3 3 0 0 0 3 3"/>',
 };
 const icon = (name) =>
@@ -72,7 +73,7 @@ function hero(d, link) {
     s.discountPercent > 0
       ? `<p class="rm-fact">${icon("mail")}<span>New users get ${trim(s.discountPercent)}% off their first purchase</span></p>`
       : "",
-    `<p class="rm-fine">${usd(s.minPayout)} minimum payout &middot; ${esc(s.holdingDays)} days holding period</p>`,
+    `<p class="rm-fine">${usd(s.minPayout)} minimum payout</p>`,
   ].join("");
 
   return `
@@ -116,23 +117,8 @@ function quickstart(d) {
   return `<div class="rm-cards">
     ${card("share", "Share your link", "Send your link anywhere. Every click, lead and conversion it drives is tracked here.")}
     ${card("book", "Program resources", "Find the assets and copy we provide in the Resources tab so your posts look the part.")}
-    ${card("wallet", "Receive earnings", `Earn ${trim(d.settings.commissionPercent)}% on every sale. Payouts are released after the ${esc(d.settings.holdingDays)}-day holding period.`)}
+    ${card("wallet", "Receive earnings", `Earn ${trim(d.settings.commissionPercent)}% on every sale. Request a payout any time once you reach the minimum.`)}
   </div>`;
-}
-
-function bounties(d) {
-  if (!d.bounties.length) return empty("No bounties right now", "Check back soon for extra rewards.");
-  return d.bounties
-    .map((b) => {
-      const pct = Math.round((b.progress / b.target) * 100);
-      return `<div class="rm-card rm-bounty">
-        <div class="rm-bounty-top"><h3 class="rm-card-h">${esc(b.title)}</h3><span class="rm-pill${b.done ? " is-done" : ""}">${b.done ? "Earned" : usd(b.reward)}</span></div>
-        ${b.description ? `<p class="rm-card-p">${esc(b.description)}</p>` : ""}
-        <div class="rm-meter" role="progressbar" aria-valuemin="0" aria-valuemax="${b.target}" aria-valuenow="${b.progress}" aria-label="${esc(b.title)} progress"><div style="width:${pct}%"></div></div>
-        <p class="rm-fine">${b.progress} of ${b.target} referred order${b.target === 1 ? "" : "s"} &middot; ${usd(b.reward)} reward</p>
-      </div>`;
-    })
-    .join("");
 }
 
 function earnings(d) {
@@ -142,8 +128,7 @@ function earnings(d) {
   const pct = s.minPayout > 0 ? Math.min(100, Math.round((t.available / s.minPayout) * 100)) : 100;
 
   const orders = d.conversions.slice(0, 20).map((c) => {
-    const matured = c.maturesAt <= new Date();
-    const state = c.status === "paid" ? "Paid" : c.status === "requested" ? "Requested" : matured ? "Payable" : "Holding";
+    const state = c.status === "paid" ? "Paid" : c.status === "requested" ? "Requested" : "Payable";
     return `<tr><td>${esc(c.orderName || "Order")}</td><td>${new Date(c.createdAt).toLocaleDateString("en-GB")}</td><td class="rm-num">${usd(c.commission)}</td><td>${state}</td></tr>`;
   });
 
@@ -175,42 +160,11 @@ function earnings(d) {
   ${payBox}
   <dl class="rm-dl rm-dl-lg"><dt>Balance (not yet paid)</dt><dd>${usd(t.upcoming)}</dd><dt>Payable now</dt><dd>${usd(t.available)}</dd><dt>Paid so far</dt><dd>${usd(t.paid)}</dd><dt>Total earned</dt><dd>${usd(total)}</dd></dl>
   <div class="rm-meter" role="progressbar" aria-valuemin="0" aria-valuemax="${s.minPayout}" aria-valuenow="${Math.min(t.available, s.minPayout)}" aria-label="Progress toward the minimum payout"><div style="width:${pct}%"></div></div>
-  <p class="rm-fine">${usd(t.available)} of ${usd(s.minPayout)} minimum payout &middot; commission is held for ${esc(s.holdingDays)} days after each order.</p>
+  <p class="rm-fine">${usd(t.available)} of ${usd(s.minPayout)} minimum payout</p>
   ${orders.length
     ? `<table class="rm-table"><thead><tr><th>Order</th><th>Date</th><th class="rm-num">Commission</th><th>Status</th></tr></thead><tbody>${orders.join("")}</tbody></table>`
     : empty("No earnings yet", "Commission from referred orders will appear here.")}
   ${history}`;
-}
-
-function links(d) {
-  const a = d.affiliate;
-  const shop = a.shop;
-  const rows = d.links.map((l) => {
-    const url = referralUrl(shop, l.code);
-    return `<div class="rm-linkrow">
-      <div class="rm-linkrow-meta"><strong>${esc(l.label)}</strong><span class="rm-fine">${count(l.clicks)} click${l.clicks === 1 ? "" : "s"}</span></div>
-      <input class="rm-input" id="rm-l-${esc(l.id)}" type="text" readonly value="${esc(url)}" aria-label="${esc(l.label)} link">
-      <button class="rm-btn" type="button" data-copy="#rm-l-${esc(l.id)}">${icon("copy")}<span>Copy</span></button>
-      <button class="rm-btn rm-btn-quiet" type="button" data-delete="${esc(l.id)}" aria-label="Delete ${esc(l.label)}">Delete</button>
-    </div>`;
-  });
-
-  return `
-  ${rows.length ? rows.join("") : empty("Only your main link so far", "Create a link per channel to see which one brings in the most clicks.")}
-  <form class="rm-row rm-newlink" data-newlink>
-    <input class="rm-input" name="label" type="text" maxlength="40" placeholder="Name this link, e.g. Instagram bio" aria-label="Link name" required>
-    <button class="rm-btn" type="submit">Create link</button>
-  </form>
-`;
-}
-
-function leaderboard(d) {
-  if (!d.leaderboard.length) return empty("No one on the board yet", "Be the first referrer to earn commission.");
-  return `<table class="rm-table"><thead><tr><th>#</th><th>Referrer</th><th class="rm-num">Orders</th><th class="rm-num">Earned</th></tr></thead><tbody>
-    ${d.leaderboard
-      .map((r) => `<tr${r.you ? ' class="is-you"' : ""}><td>${r.rank}</td><td>${esc(r.name)}${r.you ? " (you)" : ""}</td><td class="rm-num">${r.orders}</td><td class="rm-num">${usd(r.earned)}</td></tr>`)
-      .join("")}
-  </tbody></table>`;
 }
 
 function contactForm(a) {
@@ -223,12 +177,26 @@ function contactForm(a) {
 }
 
 function payoutForm(a) {
-  const opt = (m) => `<option value="${m}"${a.payoutMethod === m ? " selected" : ""}>${m}</option>`;
-  return `<form class="rm-contact" data-payout>
-    <h3 class="rm-sub">Payout details</h3>
-    <p class="rm-card-p">Tell us where to send your earnings. We pay manually, so double-check these.</p>
-    <select class="rm-input" name="method" aria-label="Payout method">${["PayPal", "Bank transfer", "Other"].map(opt).join("")}</select>
-    <textarea class="rm-input" name="details" rows="3" maxlength="300" placeholder="PayPal email, or account name + sort code + account number" aria-label="Payout details">${esc(a.payoutDetails || "")}</textarea>
+  const bank = a.payoutMethod === "Bank transfer";
+  const lines = {};
+  if (bank) for (const l of String(a.payoutDetails || "").split("\n")) { const i = l.indexOf(": "); if (i > 0) lines[l.slice(0, i)] = l.slice(i + 2); }
+  const field = (label, name, ph, val, extra = "") =>
+    `<label class="rm-field"><span>${label}</span><input class="rm-input" name="${name}" type="text" maxlength="80" placeholder="${ph}" value="${esc(val || "")}" autocomplete="off"${extra}></label>`;
+  const opt = (m) => `<option value="${m}"${(a.payoutMethod || "Bank transfer") === m ? " selected" : ""}>${m}</option>`;
+  return `<form class="rm-card rm-payform" data-payout>
+    <div class="rm-payform-head"><div class="rm-badge">${icon("wallet")}</div><div><h3 class="rm-card-h">Payout details</h3>
+    <p class="rm-card-p">Where should we send your earnings? Payments are made by bank transfer.</p></div></div>
+    <label class="rm-field"><span>Payout method</span><select class="rm-input" name="method" aria-label="Payout method" data-method>${["Bank transfer", "Other"].map(opt).join("")}</select></label>
+    <div data-bank${(a.payoutMethod || "Bank transfer") === "Bank transfer" ? "" : " hidden"}>
+      <div class="rm-grid2">
+        ${field("Account holder name", "holder", "Full name on the account", lines["Account holder"])}
+        ${field("Bank name", "bank", "e.g. Barclays", lines["Bank"])}
+        ${field("Sort code / routing number", "code", "e.g. 12-34-56", lines["Sort code / routing"])}
+        ${field("Account number / IBAN", "account", "Account number or IBAN", lines["Account number / IBAN"])}
+      </div>
+    </div>
+    <label class="rm-field" data-other${(a.payoutMethod || "Bank transfer") === "Other" ? "" : " hidden"}><span>Payment details</span><textarea class="rm-input" name="other" rows="3" maxlength="300" placeholder="Tell us how you would like to be paid">${esc(!bank ? a.payoutDetails || "" : "")}</textarea></label>
+    <p class="rm-fine rm-secure">${icon("lock")}<span>Your details are only visible to the store owner and used solely to pay you.</span></p>
     <button class="rm-btn" type="submit">Save payout details</button>
   </form>`;
 }
@@ -242,7 +210,6 @@ function settingsTab(d) {
     <dt>Referral code</dt><dd>${esc(a.code)}</dd>
     <dt>Commission</dt><dd>${trim(s.commissionPercent)}% for ${esc(s.commissionMonths)} months</dd>
     <dt>Minimum payout</dt><dd>${usd(s.minPayout)}</dd>
-    <dt>Holding period</dt><dd>${esc(s.holdingDays)} days</dd>
   </dl>
   ${d.anonymous ? contactForm(a) : '<p class="rm-fine">Your name and email come from your store account.</p>'}
   ${payoutForm(a)}`;
@@ -252,20 +219,20 @@ function settingsTab(d) {
 
 const TABS = (d) => [
   { id: "quickstart", label: "Quickstart", html: quickstart(d) },
-  { id: "bounties", label: "Bounties", badge: d.bounties.filter((b) => !b.done).length, html: bounties(d) },
   { id: "earnings", label: "Earnings", html: earnings(d) },
-  { id: "links", label: "Links", html: links(d) },
-  { id: "leaderboard", label: "Leaderboard", html: leaderboard(d) },
   { id: "faq", label: "FAQ", html: d.settings.faq ? faqHtml(d.settings.faq) : empty("No FAQ yet", "Answers to common questions will appear here.") },
   { id: "resources", label: "Resources", html: d.settings.resources ? `<div class="rm-card rm-rte">${richText(d.settings.resources)}</div>` : empty("No resources yet", "Logos, banners and copy will appear here.") },
   { id: "settings", label: "Settings", html: settingsTab(d) },
 ];
 
 const CSS = `
-.rm{--a:#5b4bdb;--b:#e0557f;--ink:currentColor;--ink2:rgba(128,128,128,1);--ink3:rgba(128,128,128,1);--bg:transparent;--bg2:rgba(128,128,128,.09);--line:rgba(128,128,128,.32);max-width:1040px;margin:0 auto;padding:32px 16px 64px;font-family:inherit;color:inherit}
-@supports (color:color-mix(in srgb,red,blue)){.rm{--ink2:color-mix(in srgb,currentColor 75%,transparent);--ink3:color-mix(in srgb,currentColor 58%,transparent);--bg2:color-mix(in srgb,currentColor 6%,transparent);--line:color-mix(in srgb,currentColor 18%,transparent)}}
+.rm{--a:#7c3aed;--b:#e0489c;--ink:currentColor;--ink2:rgba(100,100,115,1);--ink3:rgba(110,110,125,1);--bg2:rgba(124,58,237,.04);--line:rgba(124,58,237,.16);--glow:rgba(124,58,237,.10);--opt-bg:#fff;--opt-ink:#16161d;max-width:1040px;margin:0 auto;padding:32px 16px 64px;font-family:inherit;color:inherit;background:radial-gradient(ellipse 70% 380px at 50% 0,var(--glow),transparent 75%) no-repeat}
+@supports (color:color-mix(in srgb,red,blue)){.rm{--ink2:color-mix(in srgb,currentColor 75%,transparent);--ink3:color-mix(in srgb,currentColor 58%,transparent)}}
+@media (prefers-color-scheme:dark){.rm{--bg2:rgba(255,255,255,.05);--line:rgba(167,139,250,.24);--glow:rgba(124,58,237,.22);--opt-bg:#1c1530;--opt-ink:#f4f0ff}}
+:is([data-theme=dark],[data-color-scheme=dark],.dark,.dark-mode,.theme-dark) .rm{--bg2:rgba(255,255,255,.05);--line:rgba(167,139,250,.24);--glow:rgba(124,58,237,.22);--opt-bg:#1c1530;--opt-ink:#f4f0ff}
+:is([data-theme=light],[data-color-scheme=light],.light,.light-mode,.theme-light) .rm{--bg2:rgba(124,58,237,.04);--line:rgba(124,58,237,.16);--glow:rgba(124,58,237,.10);--opt-bg:#fff;--opt-ink:#16161d}
 .rm *{box-sizing:border-box}
-.rm-title{margin:0 0 20px;font-size:1.6rem;font-weight:650;color:inherit}
+.rm-title{margin:0 0 20px;font-size:1.6rem;font-weight:800;letter-spacing:-.02em;color:inherit}
 .rm-i{width:1em;height:1em;flex:none;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
 .rm-hero{display:grid;grid-template-columns:minmax(0,1fr) 220px;gap:20px;padding:20px;border:1px solid var(--line);border-radius:14px;background:var(--bg2)}
 .rm-hero-head{display:flex;justify-content:space-between;align-items:baseline;gap:12px;margin-bottom:12px}
@@ -275,8 +242,8 @@ const CSS = `
 .rm-input{flex:1;min-width:0;width:100%;padding:11px 14px;border:1px solid var(--line);border-radius:8px;background:transparent;color:inherit;font:inherit;font-size:.92rem}
 .rm-input:focus{outline:2px solid var(--a);outline-offset:1px}
 textarea.rm-input{resize:vertical}
-select.rm-input option{color:#16161d;background:#fff}
-.rm-btn{display:inline-flex;align-items:center;gap:7px;flex:none;padding:11px 20px;border:0;border-radius:8px;background:linear-gradient(100deg,var(--a),var(--b));color:#fff;font:inherit;font-size:.92rem;font-weight:600;cursor:pointer}
+select.rm-input option{color:var(--opt-ink);background:var(--opt-bg)}
+.rm-btn{box-shadow:0 6px 16px -6px rgba(124,58,237,.55);display:inline-flex;align-items:center;gap:7px;flex:none;padding:11px 20px;border:0;border-radius:8px;background:linear-gradient(100deg,var(--a),var(--b));color:#fff;font:inherit;font-size:.92rem;font-weight:600;cursor:pointer}
 .rm-btn:hover{opacity:.92}
 .rm-btn[disabled]{opacity:.4;cursor:not-allowed}
 .rm-btn.is-done{background:#17794f;color:#fff}
@@ -305,7 +272,11 @@ select.rm-input option{color:#16161d;background:#fff}
 .rm-badge{display:grid;place-items:center;width:40px;height:40px;margin-bottom:14px;border-radius:10px;background:linear-gradient(135deg,var(--a),var(--b));color:#fff;font-size:20px}
 .rm-card-h{margin:0 0 6px;font-size:.95rem;font-weight:650}
 .rm-card-p{margin:0;font-size:.86rem;line-height:1.5;color:var(--ink2)}
-.rm-bounty-top{display:flex;justify-content:space-between;gap:12px;align-items:baseline}
+.rm-field{display:flex;flex-direction:column;gap:6px;font-size:.8rem;font-weight:600;color:var(--ink2)}.rm-field span{letter-spacing:.01em}
+.rm-grid2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;margin-top:2px}
+.rm-payform{display:flex;flex-direction:column;gap:16px;max-width:560px;margin-top:20px}.rm-payform .rm-btn{align-self:flex-start}
+.rm-payform-head{display:flex;gap:14px;align-items:center}.rm-payform-head .rm-badge{margin:0;flex:none}
+.rm-secure{display:flex;align-items:center;gap:8px;margin:0}
 .rm-pill{padding:2px 10px;border-radius:999px;border:1px solid var(--line);font-size:.8rem;font-weight:600}
 .rm-pill.is-done{background:#17794f;color:#fff;border-color:transparent}
 .rm-meter{height:8px;margin-top:12px;border-radius:999px;background:var(--line);overflow:hidden}
@@ -314,9 +285,6 @@ select.rm-input option{color:#16161d;background:#fff}
 .rm-table th,.rm-table td{padding:10px 12px;text-align:left;border-bottom:1px solid var(--line)}
 .rm-table th{font-size:.78rem;color:var(--ink3)}.rm-num{text-align:right!important;font-variant-numeric:tabular-nums}
 .is-you td{font-weight:650;background:var(--bg2)}
-.rm-linkrow{display:grid;grid-template-columns:150px minmax(0,1fr) auto auto;gap:8px;align-items:center;margin-bottom:10px}
-.rm-linkrow-meta{display:flex;flex-direction:column}.rm-linkrow-meta .rm-fine{margin:0}
-.rm-newlink{margin-top:16px}
 .rm-contact{display:flex;flex-direction:column;gap:10px;max-width:420px;margin-top:8px}.rm-contact .rm-btn{align-self:flex-start}.rm-error{margin:10px 0 0;color:#e5484d;font-size:.86rem}
 .rm-pay{display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap}
 .rm-big{font-size:1.9rem;font-weight:700;font-variant-numeric:tabular-nums}
@@ -328,8 +296,7 @@ select.rm-input option{color:#16161d;background:#fff}
 .rm-empty{display:flex;flex-direction:column;gap:4px;padding:28px;border:1px dashed var(--line);border-radius:12px;color:var(--ink2);text-align:center}
 .rm-gate{max-width:520px;margin:48px auto;padding:32px;border:1px solid var(--line);border-radius:14px;background:var(--bg2);text-align:center}
 .rm-gate .rm-btn{text-decoration:none;justify-content:center;margin-top:12px}
-@media (max-width:860px){.rm-hero{grid-template-columns:minmax(0,1fr)}.rm-brand{min-height:90px;order:-1}.rm-tiles{grid-template-columns:repeat(2,minmax(0,1fr))}.rm-cards{grid-template-columns:minmax(0,1fr)}.rm-linkrow{grid-template-columns:minmax(0,1fr) auto auto}.rm-linkrow-meta{grid-column:1/-1}}
-@media (max-width:520px){.rm-tiles{grid-template-columns:minmax(0,1fr)}.rm-row{flex-direction:column}.rm-btn{justify-content:center}}
+@media (max-width:860px){.rm-hero{grid-template-columns:minmax(0,1fr)}.rm-brand{min-height:90px;order:-1}.rm-tiles{grid-template-columns:repeat(2,minmax(0,1fr))}.rm-cards{grid-template-columns:minmax(0,1fr)}@media (max-width:520px){.rm-grid2{grid-template-columns:minmax(0,1fr)}.rm-tiles{grid-template-columns:minmax(0,1fr)}.rm-row{flex-direction:column}.rm-btn{justify-content:center}}
 `;
 
 const JS = `
@@ -369,18 +336,17 @@ const JS = `
       else { try { document.execCommand('copy'); } catch (x) {} done(); }
       return;
     }
-    var del = e.target.closest('[data-delete]');
-    if (del && confirm('Delete this link? It will stop working.')) post({ intent: 'deleteLink', id: del.getAttribute('data-delete') });
-  });
-
-  var form = root.querySelector('[data-newlink]');
-  if (form) form.addEventListener('submit', function (e) {
-    e.preventDefault(); post({ intent: 'createLink', label: form.elements.label.value });
   });
 
   var payout = root.querySelector('[data-payout]');
   if (payout) payout.addEventListener('submit', function (e) {
-    e.preventDefault(); post({ intent: 'savePayout', method: payout.elements.method.value, details: payout.elements.details.value });
+    e.preventDefault(); var f = payout.elements; if (f.method.value === 'Bank transfer' && (!f.holder.value.trim() || !f.account.value.trim())) { var er = root.querySelector('[data-error]'); er.textContent = 'Enter the account holder name and account number.'; er.hidden = false; return; }
+    var d = f.method.value === 'Bank transfer' ? ['Account holder: ' + f.holder.value.trim(), 'Bank: ' + f.bank.value.trim(), 'Sort code / routing: ' + f.code.value.trim(), 'Account number / IBAN: ' + f.account.value.trim()].join('\\n') : f.other.value; post({ intent: 'savePayout', method: f.method.value, details: d });
+  });
+  var methodSel = root.querySelector('[data-method]');
+  if (methodSel) methodSel.addEventListener('change', function () {
+    var bank = methodSel.value === 'Bank transfer';
+    root.querySelector('[data-bank]').hidden = !bank; root.querySelector('[data-other]').hidden = bank;
   });
   var reqBtn = root.querySelector('[data-request-payout]');
   if (reqBtn) reqBtn.addEventListener('click', function () {
@@ -415,27 +381,37 @@ const shell = (inner) => `{% raw %}<style>${CSS}</style>{% endraw %}<main class=
 // gives their browser a random id (kept in localStorage) and reloads the dashboard with
 // it as ?vid=, which is how the server tells visitors apart. Shopify's proxy signature
 // covers query parameters the browser adds, so ?vid= arrives intact.
-const BOOT = `
+// Login gate. The storefront login keeps the signed-in user in localStorage
+// (tt-uid, tt-email). No tt-uid -> not logged in -> send them to /pages/login.
+// The dashboard is also keyed to tt-uid, so if ?vid= is missing or differs
+// (e.g. another account logged in on this browser) reload with the right one.
+// The page stays hidden until the check passes.
+const GUARD = `
 (function () {
-  var key = 'rm_vid', vid = '';
-  try { vid = localStorage.getItem(key) || ''; } catch (e) {}
-  if (!/^[A-Za-z0-9]{16,64}$/.test(vid)) {
-    var a = new Uint8Array(16);
-    (window.crypto || window.msCrypto).getRandomValues(a);
-    vid = '';
-    for (var i = 0; i < a.length; i++) vid += ('0' + a[i].toString(16)).slice(-2);
-    try { localStorage.setItem(key, vid); } catch (e) {}
+  var uid = '', email = '';
+  try { uid = localStorage.getItem('tt-uid') || ''; email = localStorage.getItem('tt-email') || ''; } catch (e) {}
+  if (!/^[A-Za-z0-9]{16,64}$/.test(uid) || !email) {
+    location.replace('/pages/login?return_to=' + encodeURIComponent(location.pathname));
+    return;
   }
-  location.replace(location.pathname + '?vid=' + vid + (location.hash || ''));
+  var vid = new URLSearchParams(location.search).get('vid');
+  if (vid !== uid) {
+    location.replace(location.pathname + '?vid=' + uid + (location.hash || ''));
+    return;
+  }
+  var m = document.querySelector('main.rm');
+  if (m) m.style.visibility = 'visible';
 })();
 `;
 
+const guarded = (inner) =>
+  `{% raw %}<style>main.rm{visibility:hidden}</style>{% endraw %}` +
+  shell(inner) +
+  `{% raw %}<script>${GUARD}</script>{% endraw %}`;
+
 export function renderBootstrap() {
-  return (
-    shell(`<h1 class="rm-title">Referral dashboard</h1><p class="rm-card-p">Loading your dashboard&hellip;</p>
-    <noscript><p class="rm-card-p">Please turn on JavaScript to see your referral dashboard.</p></noscript>`) +
-    `{% raw %}<script>${BOOT}</script>{% endraw %}`
-  );
+  return guarded(`<h1 class="rm-title">Referral dashboard</h1><p class="rm-card-p">Loading your dashboard&hellip;</p>
+    <noscript><p class="rm-card-p">Please turn on JavaScript to see your referral dashboard.</p></noscript>`);
 }
 
 export function renderDisabled() {
@@ -449,7 +425,7 @@ export function renderDashboard(d) {
   const link = referralUrl(d.affiliate.shop, d.affiliate.code);
   const tabs = TABS(d);
   return (
-    shell(`
+    guarded(`
   <h1 class="rm-title">Referral dashboard</h1>
   ${hero(d, link)}
   ${tiles(d)}

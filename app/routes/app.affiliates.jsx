@@ -9,7 +9,6 @@ const fmt = (symbol) => (v) => `${symbol}${Number(v || 0).toFixed(2)}`;
 export const loader = async ({ request }) => {
   const { session } = await authenticate.admin(request);
   const shop = session.shop;
-  const now = new Date();
 
   const [settings, affiliates, conversions, payouts] = await Promise.all([
     getSettings(shop),
@@ -33,8 +32,7 @@ export const loader = async ({ request }) => {
       clicks: a.clicks,
       leads: a.leads,
       orders: mine.length,
-      pending: unpaid.filter((c) => c.maturesAt > now).reduce((t, c) => t + c.commission, 0),
-      payable: unpaid.filter((c) => c.maturesAt <= now).reduce((t, c) => t + c.commission, 0),
+      payable: unpaid.reduce((t, c) => t + c.commission, 0),
       paid: mine.filter((c) => c.status === "paid").reduce((t, c) => t + c.commission, 0),
     };
   });
@@ -60,7 +58,7 @@ export const action = async ({ request }) => {
   const note = form.get("note");
 
   // Run after the merchant has sent the money by hand. Everything is scoped to THIS
-  // shop, and only commission past its holding period can be paid.
+  // shop.
   if (intent === "markRequestPaid") return markPaid(session.shop, { payoutId: String(form.get("payoutId")), note });
   if (intent === "markPaid") return markPaid(session.shop, { affiliateId: String(form.get("id")), note });
   if (intent === "rejectRequest") return rejectPayout(session.shop, String(form.get("payoutId")), note);
@@ -104,7 +102,7 @@ export default function Affiliates() {
           ))
         )}
         <s-paragraph>
-          Send the money yourself from your own bank or PayPal, then press "mark paid". The customer's balance goes back to {usd(0)}.
+          Send the money yourself from your own bank, then press "mark paid". The customer's balance goes back to {usd(0)}.
         </s-paragraph>
       </s-section>
 
@@ -120,7 +118,6 @@ export default function Affiliates() {
               <s-table-header format="numeric">Clicks</s-table-header>
               <s-table-header format="numeric">Leads</s-table-header>
               <s-table-header format="numeric">Orders</s-table-header>
-              <s-table-header format="numeric">Holding</s-table-header>
               <s-table-header format="numeric">Payable</s-table-header>
               <s-table-header format="numeric">Paid</s-table-header>
               <s-table-header>Payout details</s-table-header>
@@ -133,7 +130,6 @@ export default function Affiliates() {
                   <s-table-cell>{r.clicks}</s-table-cell>
                   <s-table-cell>{r.leads}</s-table-cell>
                   <s-table-cell>{r.orders}</s-table-cell>
-                  <s-table-cell>{usd(r.pending)}</s-table-cell>
                   <s-table-cell>{usd(r.payable)}</s-table-cell>
                   <s-table-cell>{usd(r.paid)}</s-table-cell>
                   <s-table-cell>{r.payoutMethod ? `${r.payoutMethod}: ${r.payoutDetails}` : "Not added"}</s-table-cell>

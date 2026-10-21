@@ -76,7 +76,6 @@ const sum = (rows, pick) => rows.reduce((total, r) => total + pick(r), 0);
 export async function dashboardFor(affiliate) {
   const { shop } = affiliate;
   const settings = await getSettings(shop);
-  const now = new Date();
 
   const [links, conversions, bounties, board, payouts] = await Promise.all([
     prisma.affiliateLink.findMany({ where: { affiliateId: affiliate.id }, orderBy: { createdAt: "desc" } }),
@@ -93,8 +92,8 @@ export async function dashboardFor(affiliate) {
   const upcoming = sum(unpaid, (c) => c.commission);
   // Asked for, waiting for the merchant to send it.
   const requested = sum(unpaid.filter((c) => c.status === "requested"), (c) => c.commission);
-  // Past the holding period and free to withdraw.
-  const available = sum(unpaid.filter((c) => c.status !== "requested" && c.maturesAt <= now), (c) => c.commission);
+  // Free to withdraw (no holding period).
+  const available = sum(unpaid.filter((c) => c.status !== "requested"), (c) => c.commission);
 
   const orders = live.length;
   return {

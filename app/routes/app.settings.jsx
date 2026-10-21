@@ -1,17 +1,13 @@
 import { useLoaderData, useActionData, useNavigation, Form } from "react-router";
 import { authenticate } from "../shopify.server";
-import prisma from "../db.server";
 import { getSettings, saveSettings } from "../settings.server";
 import { syncDiscountPercent } from "../discount.server";
 
 export const loader = async ({ request }) => {
   const { session } = await authenticate.admin(request);
   const shop = session.shop;
-  const [settings, bounties] = await Promise.all([
-    getSettings(shop),
-    prisma.bounty.findMany({ where: { shop }, orderBy: { createdAt: "asc" } }),
-  ]);
-  return { settings, bounties };
+  const settings = await getSettings(shop);
+  return { settings };
 };
 
 export const action = async ({ request }) => {
@@ -33,40 +29,13 @@ export const action = async ({ request }) => {
     return { saved: true, sync };
   }
 
-  if (intent === "addBounty") {
-    const title = String(form.get("title") || "").trim();
-    if (!title) return { error: "A bounty needs a title." };
-    await prisma.bounty.create({
-      data: {
-        shop,
-        title,
-        description: String(form.get("description") || "").trim() || null,
-        reward: Math.max(0, Number(form.get("reward")) || 0),
-        target: Math.max(1, Math.round(Number(form.get("target")) || 1)),
-      },
-    });
-    return { bountyAdded: true };
-  }
-
-  if (intent === "toggleBounty" || intent === "deleteBounty") {
-    const id = String(form.get("id"));
-    // Scoped to this shop so one merchant can never touch another's bounty.
-    if (intent === "deleteBounty") {
-      await prisma.bounty.deleteMany({ where: { id, shop } });
-    } else {
-      const bounty = await prisma.bounty.findFirst({ where: { id, shop } });
-      if (bounty) await prisma.bounty.update({ where: { id }, data: { active: !bounty.active } });
-    }
-    return { ok: true };
-  }
-
   return { ok: true };
 };
 
 // React 18 writes a boolean prop on a custom element as the attribute "false" — which
 // still counts as present. Only ever pass these props when they are true.
 export default function Settings() {
-  const { settings, bounties } = useLoaderData();
+  const { settings } = useLoaderData();
   const result = useActionData();
   const busy = useNavigation().state !== "idle";
 
@@ -91,7 +60,6 @@ export default function Settings() {
           <s-stack gap="base">
             <s-number-field label="Commission (%)" name="commissionPercent" value={String(settings.commissionPercent)} min="0" max="100" step="0.5" />
             <s-number-field label="Earns for (months)" name="commissionMonths" value={String(settings.commissionMonths)} min="1" max="120" details="How long after the first referred order the customer keeps earning on that shopper's purchases." />
-            <s-number-field label="Holding period (days)" name="holdingDays" value={String(settings.holdingDays)} min="0" max="365" details="Commission becomes payable this long after the order." />
             <s-number-field label={`Minimum payout (${settings.currency})`} name="minPayout" value={String(settings.minPayout)} min="0" />
             <s-text-field label="Currency symbol" name="currency" value={settings.currency} details="Shown before every amount, e.g. £, $ or €." />
           </s-stack>
@@ -116,48 +84,6 @@ export default function Settings() {
           </s-stack>
         </s-section>
       </Form>
-
-      <s-section heading="Bounties">
-        <s-paragraph>Extra rewards shown on the customer's Bounties tab. A bounty is earned once they reach the target number of referred orders.</s-paragraph>
-
-        {bounties.length === 0 && <s-paragraph>No bounties yet.</s-paragraph>}
-        {bounties.map((b) => (
-          <s-box key={b.id} padding="base" borderWidth="base" borderRadius="base">
-            <s-stack direction="inline" gap="base" alignItems="center" justifyContent="space-between">
-              <s-stack gap="none">
-                <s-heading>{b.title}{b.active ? "" : " (hidden)"}</s-heading>
-                <s-text tone="neutral">
-                  ${b.reward.toFixed(2)} for {b.target} referred order{b.target === 1 ? "" : "s"}
-                  {b.description ? ` · ${b.description}` : ""}
-                </s-text>
-              </s-stack>
-              <s-stack direction="inline" gap="small">
-                <Form method="post">
-                  <input type="hidden" name="id" value={b.id} />
-                  <s-button type="submit" name="intent" value="toggleBounty">{b.active ? "Hide" : "Show"}</s-button>
-                </Form>
-                <Form method="post">
-                  <input type="hidden" name="id" value={b.id} />
-                  <s-button type="submit" name="intent" value="deleteBounty" tone="critical">Delete</s-button>
-                </Form>
-              </s-stack>
-            </s-stack>
-          </s-box>
-        ))}
-
-        <Form method="post">
-          <input type="hidden" name="intent" value="addBounty" />
-          <s-stack gap="base">
-            <s-text-field label="Title" name="title" />
-            <s-text-field label="Description (optional)" name="description" />
-            <s-stack direction="inline" gap="base">
-              <s-number-field label={`Reward (${settings.currency})`} name="reward" min="0" value="10" />
-              <s-number-field label="Referred orders needed" name="target" min="1" value="1" />
-            </s-stack>
-            <s-button type="submit" {...(busy ? { disabled: true } : {})}>Add bounty</s-button>
-          </s-stack>
-        </Form>
-      </s-section>
     </s-page>
   );
 }
